@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 from telegram import Update, Bot, BotCommand
 from telegram.ext import Application, CommandHandler, ContextTypes
@@ -7,6 +8,9 @@ import dateparser
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from db import init_db, add_deadline, get_all_deadlines, get_soon_deadlines, delete_deadline, get_all_holidays
 from display import get_effective_dates, format_grouped, format_with_ids
+
+RIYADH_TZ = ZoneInfo("Asia/Riyadh")
+DATEPARSER_SETTINGS = {"TIMEZONE": "Asia/Riyadh", "RETURN_AS_TIMEZONE_AWARE": False}
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -35,8 +39,8 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     class_name = parts[0]
     name = parts[1]
-    start = dateparser.parse(parts[2])
-    due = dateparser.parse(parts[3])
+    start = dateparser.parse(parts[2], settings=DATEPARSER_SETTINGS)
+    due = dateparser.parse(parts[3], settings=DATEPARSER_SETTINGS)
     link = parts[4].strip() if len(parts) > 4 and parts[4].strip() else None
     recurring = parts[5].strip().lower() if len(parts) > 5 and parts[5].strip() else None
 
@@ -80,7 +84,7 @@ async def list_deadlines(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
     # Filter out past deadlines
-    now = datetime.now()
+    now = datetime.now(RIYADH_TZ).replace(tzinfo=None)
     filtered = []
     for d in deadlines:
         id, name, class_name, start, due, link, recurring = d
@@ -102,7 +106,7 @@ async def today(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("مافيه مواعيد نهائية اليوم 🎉")
         return
 
-    now = datetime.now()
+    now = datetime.now(RIYADH_TZ).replace(tzinfo=None)
     filtered = []
     for d in deadlines:
         id, name, class_name, start, due, link, recurring = d
@@ -124,7 +128,7 @@ async def month(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("مافيه مواعيد نهائية هالشهر 🎉")
         return
 
-    now = datetime.now()
+    now = datetime.now(RIYADH_TZ).replace(tzinfo=None)
     cutoff = now + timedelta(days=30)
     filtered = []
     for d in deadlines:
@@ -148,7 +152,7 @@ async def week(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Filter recurring deadlines to only those due within 7 days
-    now = datetime.now()
+    now = datetime.now(RIYADH_TZ).replace(tzinfo=None)
     cutoff = now + timedelta(days=7)
     filtered = []
     for d in deadlines:
@@ -172,7 +176,7 @@ async def upcoming(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Sort by effective due date and take first 3
-    now = datetime.now()
+    now = datetime.now(RIYADH_TZ).replace(tzinfo=None)
     sorted_deadlines = []
     for d in deadlines:
         id, name, class_name, start, due, link, recurring = d
@@ -248,7 +252,7 @@ async def test_notify(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def check_reminders(bot: Bot):
     """Check for deadlines and send reminders."""
     deadlines = get_all_deadlines()
-    now = datetime.now()
+    now = datetime.now(RIYADH_TZ).replace(tzinfo=None)
 
     for id, name, class_name, start, due, link, recurring in deadlines:
         _, due_dt = get_effective_dates(start, due, recurring)
@@ -278,7 +282,7 @@ async def weekly_summary(bot: Bot):
         await bot.send_message(CHAT_ID, "📅 ملخص الأسبوع\n\nمافيه مواعيد نهائية هالأسبوع 🎉", message_thread_id=TOPIC_ID)
         return
 
-    now = datetime.now()
+    now = datetime.now(RIYADH_TZ).replace(tzinfo=None)
     cutoff = now + timedelta(days=7)
     filtered = []
     for d in deadlines:
@@ -306,7 +310,7 @@ async def post_init(application):
         BotCommand("holidays", "الإجازات الأكاديمية"),
     ])
 
-    scheduler = AsyncIOScheduler()
+    scheduler = AsyncIOScheduler(timezone=RIYADH_TZ)
     scheduler.add_job(check_reminders, "interval", hours=1, args=[application.bot])
     scheduler.add_job(weekly_summary, "cron", day_of_week="sat", hour=17, args=[application.bot])
     scheduler.start()
