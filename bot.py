@@ -14,7 +14,6 @@ TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = int(os.getenv("OWNER_ID"))
 CHAT_ID = int(os.getenv("CHAT_ID"))
 TOPIC_ID = int(os.getenv("TOPIC_ID") or 0) or None
-MIDTERM_DURATION_MINUTES = 5
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,10 +52,6 @@ async def add(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not due:
         await update.message.reply_text("ما قدرت أفهم الموعد النهائي.")
         return
-
-    normalized_name = "".join(character for character in name.lower() if character.isalnum())
-    if "midterm" in normalized_name:
-        due = start + timedelta(minutes=MIDTERM_DURATION_MINUTES)
 
     add_deadline(name, class_name, start, due, link, recurring)
     msg = f"تم ✓\n{class_name} — {name}\n🟢 {start.strftime('%b %d %I:%M %p')}\n🔴 {due.strftime('%b %d %I:%M %p')}"
